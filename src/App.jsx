@@ -6,18 +6,15 @@ import usersFromServer from './api/users';
 import categoriesFromServer from './api/categories';
 import productsFromServer from './api/products';
 
-const categoryMap = categoriesFromServer.reduce((acc, cat) => {
-  acc[cat.id] = cat;
-  return acc;
-}, {});
+const categoryMap = Object.fromEntries(
+  categoriesFromServer.map(cat => [cat.id, cat]),
+);
 
-const userMap = usersFromServer.reduce((acc, user) => {
-  acc[user.id] = user;
-  return acc;
-}, {});
+const userMap = Object.fromEntries(
+  usersFromServer.map(user => [user.id, user]),
+);
 
-
-const products = productsFromServer.map((product) => {
+const products = productsFromServer.map(product => {
   const category = categoryMap[product.categoryId];
   const owner = category ? userMap[category.ownerId] : null;
 
@@ -28,21 +25,15 @@ const products = productsFromServer.map((product) => {
   };
 });
 
-export const App = () => { 
-  const getOwnerColorClass = (sex) => {
+export const App = () => {
+  const getOwnerColorClass = sex => {
     return sex === 'm' ? 'has-text-link' : 'has-text-danger';
   };
 
-  const productRows = products.map((product) => {
-    const {
-      id,
-      name,
-      categoryDetails,
-      ownerDetails,
-    } = product;
+  const productRows = products.map(product => {
+    const { id, name, categoryDetails, ownerDetails } = product;
 
     if (!categoryDetails || !ownerDetails) {
-      console.warn(`Product ID ${id} is missing linked category or owner data.`);
       return null;
     }
 
@@ -55,13 +46,8 @@ export const App = () => {
           {id}
         </td>
         <td data-cy="ProductName">{name}</td>
-        <td data-cy="ProductCategory">
-          {categoryDisplay}
-        </td>
-        <td
-          data-cy="ProductUser"
-          className={ownerClassName}
-        >
+        <td data-cy="ProductCategory">{categoryDisplay}</td>
+        <td data-cy="ProductUser" className={ownerClassName}>
           {ownerDetails.name}
         </td>
       </tr>
@@ -70,20 +56,24 @@ export const App = () => {
 
   return (
     <div className="section">
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
-      <script src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
+      />
+      <script src="https://use.fontawesome.com/releases/v5.3.1/js/all.js" />
 
       <div className="container">
         <h1 className="title">Product Categories</h1>
-
 
         <div className="block">
           <nav className="panel">
             <p className="panel-heading">Filters</p>
 
             <p className="panel-tabs has-text-weight-bold">
-              <a data-cy="FilterAllUsers" href="#/" className="is-active">All</a>
-  
+              <a data-cy="FilterAllUsers" href="#/" className="is-active">
+                All
+              </a>
+
               {usersFromServer.map(user => (
                 <a key={user.id} data-cy="FilterUser" href="#/">
                   {user.name} ({user.sex})
@@ -108,16 +98,31 @@ export const App = () => {
             </div>
 
             <div className="panel-block is-flex-wrap-wrap">
-              <a href="#/" data-cy="AllCategories" className="button is-success mr-6 is-outlined">All</a>
+              <a
+                href="#/"
+                data-cy="AllCategories"
+                className="button is-success mr-6 is-outlined"
+              >
+                All
+              </a>
               {categoriesFromServer.map(cat => (
-                <a key={cat.id} data-cy="Category" className="button mr-2 my-1" href="#/">
+                <a
+                  key={cat.id}
+                  data-cy="Category"
+                  className="button mr-2 my-1"
+                  href="#/"
+                >
                   {cat.icon} {cat.title}
                 </a>
               ))}
             </div>
 
             <div className="panel-block">
-              <a data-cy="ResetAllButton" href="#/" className="button is-link is-outlined is-fullwidth">
+              <a
+                data-cy="ResetAllButton"
+                href="#/"
+                className="button is-link is-outlined is-fullwidth"
+              >
                 Reset all filters
               </a>
             </div>
@@ -147,7 +152,9 @@ export const App = () => {
                   </th>
 
                   <th>
-                    <span className="is-flex is-flex-wrap-nowrap">Category</span>
+                    <span className="is-flex is-flex-wrap-nowrap">
+                      Category
+                    </span>
                   </th>
 
                   <th>
@@ -156,9 +163,7 @@ export const App = () => {
                 </tr>
               </thead>
 
-              <tbody>
-                {productRows}
-              </tbody>
+              <tbody>{productRows}</tbody>
             </table>
           )}
         </div>
