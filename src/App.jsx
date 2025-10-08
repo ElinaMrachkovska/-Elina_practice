@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/accessible-emoji */
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import './App.scss';
 
 import usersFromServer from './api/users';
@@ -9,12 +9,11 @@ import productsFromServer from './api/products';
 const categoryMap = Object.fromEntries(
   categoriesFromServer.map(cat => [cat.id, cat]),
 );
-
 const userMap = Object.fromEntries(
   usersFromServer.map(user => [user.id, user]),
 );
 
-const products = productsFromServer.map(product => {
+const joinedProducts = productsFromServer.map(product => {
   const category = categoryMap[product.categoryId];
   const owner = category ? userMap[category.ownerId] : null;
 
@@ -26,11 +25,123 @@ const products = productsFromServer.map(product => {
 });
 
 export const App = () => {
-  const getOwnerColorClass = sex => {
-    return sex === 'm' ? 'has-text-link' : 'has-text-danger';
+  const [selectedOwnerId, setSelectedOwnerId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
+  const [sortingColumn, setSortingColumn] = useState(null);
+  const [sortingOrder, setSortingOrder] = useState('asc');
+
+  const handleOwnerSelect = (id, event) => {
+    event.preventDefault();
+    setSelectedOwnerId(id);
   };
 
-  const productRows = products.map(product => {
+  const handleCategorySelect = (id, event) => {
+    event.preventDefault();
+    setSelectedCategoryIds(currentIds =>
+      currentIds.includes(id)
+        ? currentIds.filter(categoryId => categoryId !== id)
+        : [...currentIds, id],
+    );
+  };
+
+  const handleSearchChange = event => setSearchQuery(event.target.value);
+
+  const handleSearchClear = event => {
+    event.preventDefault();
+    setSearchQuery('');
+  };
+
+  const handleSorting = newColumn => {
+    if (sortingColumn !== newColumn) {
+      setSortingColumn(newColumn);
+      setSortingOrder('asc');
+    } else if (sortingOrder === 'asc') {
+      setSortingOrder('desc');
+    } else {
+      setSortingColumn(null);
+      setSortingOrder('asc');
+    }
+  };
+
+  const handleResetAllFilters = event => {
+    event.preventDefault();
+    setSelectedOwnerId(null);
+    setSearchQuery('');
+    setSelectedCategoryIds([]);
+    setSortingColumn(null);
+    setSortingOrder('asc');
+  };
+
+  const filteredProducts = useMemo(() => {
+    let currentProducts = Array.isArray(joinedProducts)
+      ? [...joinedProducts]
+      : [];
+
+    if (selectedOwnerId !== null) {
+      currentProducts = currentProducts.filter(
+        p => p.ownerDetails && p.ownerDetails.id === selectedOwnerId,
+      );
+    }
+
+    if (searchQuery.trim() !== '') {
+      const queryLower = searchQuery.trim().toLowerCase();
+
+      currentProducts = currentProducts.filter(p =>
+        p.name.toLowerCase().includes(queryLower),
+      );
+    }
+
+    if (selectedCategoryIds.length > 0) {
+      currentProducts = currentProducts.filter(
+        p =>
+          p.categoryDetails &&
+          selectedCategoryIds.includes(p.categoryDetails.id),
+      );
+    }
+
+    if (sortingColumn) {
+      currentProducts.sort((p1, p2) => {
+        let val1;
+        let val2;
+
+        if (sortingColumn === 'name') {
+          val1 = p1.name;
+          val2 = p2.name;
+        } else if (sortingColumn === 'categoryDetails.title') {
+          val1 = p1.categoryDetails ? p1.categoryDetails.title : '';
+          val2 = p2.categoryDetails ? p2.categoryDetails.title : '';
+        } else {
+          return 0;
+        }
+
+        const comparison = val1.localeCompare(val2);
+
+        return sortingOrder === 'asc' ? comparison : -comparison;
+      });
+    }
+
+    return currentProducts;
+  }, [
+    selectedOwnerId,
+    searchQuery,
+    selectedCategoryIds,
+    sortingColumn,
+    sortingOrder,
+  ]);
+
+  const getOwnerColorClass = sex =>
+    sex === 'm' ? 'has-text-link' : 'has-text-danger';
+
+  const renderSortIcon = columnKey => {
+    if (sortingColumn === columnKey) {
+      return sortingOrder === 'asc' ? ' ⬆️' : ' ⬇️';
+    }
+
+    return '';
+  };
+
+  const productRows = filteredProducts.map(product => {
     const { id, name, categoryDetails, ownerDetails } = product;
 
     if (!categoryDetails || !ownerDetails) {
@@ -54,6 +165,8 @@ export const App = () => {
     );
   });
 
+  const productCount = filteredProducts.length;
+
   return (
     <div className="section">
       <link
@@ -70,12 +183,22 @@ export const App = () => {
             <p className="panel-heading">Filters</p>
 
             <p className="panel-tabs has-text-weight-bold">
-              <a data-cy="FilterAllUsers" href="#/" className="is-active">
+              <a
+                data-cy="FilterAllUsers"
+                href="#/"
+                className={selectedOwnerId === null ? 'is-active' : ''}
+                onClick={e => handleOwnerSelect(null, e)}
+              >
                 All
               </a>
-
               {usersFromServer.map(user => (
-                <a key={user.id} data-cy="FilterUser" href="#/">
+                <a
+                  key={user.id}
+                  data-cy="FilterUser"
+                  href="#/"
+                  className={selectedOwnerId === user.id ? 'is-active' : ''}
+                  onClick={e => handleOwnerSelect(user.id, e)}
+                >
                   {user.name} ({user.sex})
                 </a>
               ))}
@@ -87,13 +210,22 @@ export const App = () => {
                   data-cy="SearchField"
                   type="text"
                   className="input"
-                  placeholder="Search"
-                  value=""
-                  readOnly
+                  placeholder="Search by Product Name"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
                 />
                 <span className="icon is-left">
                   <i className="fas fa-search" aria-hidden="true" />
                 </span>
+                {searchQuery.length > 0 && (
+                  <a
+                    href="#/"
+                    className="icon is-right"
+                    onClick={handleSearchClear}
+                  >
+                    <i className="fas fa-times" aria-hidden="true" />
+                  </a>
+                )}
               </p>
             </div>
 
@@ -101,27 +233,38 @@ export const App = () => {
               <a
                 href="#/"
                 data-cy="AllCategories"
-                className="button is-success mr-6 is-outlined"
+                className={`button is-success mr-6 ${
+                  selectedCategoryIds.length === 0 ? '' : 'is-outlined'
+                }`}
+                onClick={e => {
+                  e.preventDefault();
+                  setSelectedCategoryIds([]);
+                }}
               >
-                All
+                All Categories
               </a>
               {categoriesFromServer.map(cat => (
                 <a
                   key={cat.id}
                   data-cy="Category"
-                  className="button mr-2 my-1"
                   href="#/"
+                  className={`button mr-2 my-1 ${
+                    selectedCategoryIds.includes(cat.id)
+                      ? 'is-link'
+                      : 'is-outlined'
+                  }`}
+                  onClick={e => handleCategorySelect(cat.id, e)}
                 >
                   {cat.icon} {cat.title}
                 </a>
               ))}
             </div>
-
             <div className="panel-block">
               <a
                 data-cy="ResetAllButton"
                 href="#/"
                 className="button is-link is-outlined is-fullwidth"
+                onClick={handleResetAllFilters}
               >
                 Reset all filters
               </a>
@@ -130,13 +273,14 @@ export const App = () => {
         </div>
 
         <div className="box table-container">
-          {products.length === 0 && (
-            <p data-cy="NoMatchingMessage">
+          {productCount === 0 ? (
+            <p
+              data-cy="NoMatchingMessage"
+              className="has-text-centered has-text-grey-light p-5"
+            >
               No products matching selected criteria
             </p>
-          )}
-
-          {products.length > 0 && (
+          ) : (
             <table
               data-cy="ProductTable"
               className="table is-striped is-narrow is-fullwidth"
@@ -146,23 +290,27 @@ export const App = () => {
                   <th>
                     <span className="is-flex is-flex-wrap-nowrap">ID</span>
                   </th>
-
-                  <th>
-                    <span className="is-flex is-flex-wrap-nowrap">Product</span>
-                  </th>
-
-                  <th>
+                  <th
+                    onClick={() => handleSorting('name')}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <span className="is-flex is-flex-wrap-nowrap">
-                      Category
+                      Product{renderSortIcon('name')}
                     </span>
                   </th>
-
+                  <th
+                    onClick={() => handleSorting('categoryDetails.title')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <span className="is-flex is-flex-wrap-nowrap">
+                      Category{renderSortIcon('categoryDetails.title')}
+                    </span>
+                  </th>
                   <th>
                     <span className="is-flex is-flex-wrap-nowrap">User</span>
                   </th>
                 </tr>
               </thead>
-
               <tbody>{productRows}</tbody>
             </table>
           )}
